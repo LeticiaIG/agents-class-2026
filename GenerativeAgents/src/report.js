@@ -25,7 +25,7 @@ function chartData(){
 }
 function buildRecord(){
   const code=a=>a.pf.code,last=i=>i.versions[i.versions.length-1];
-  const rec={created:new Date().toISOString(),run:runNo,lang,days:CFG.days,model:LLM.on?LLM.model:null,you:userAgent?code(userAgent):null,
+  const rec={created:new Date().toISOString(),run:runNo,lang,days:CFG.days,model:LLM.on?LLM.model:null,memory:RUN_MEM,you:userAgent?code(userAgent):null,
     agents:Object.fromEntries(agents.filter(a=>a.active||a.user).map(a=>[code(a),{name:a.pf.name||"",label:tr(who(a)),img:a.tex[0].url,project:a.pf.project,you:!!a.user}])),
     ideas:IDEAS.map(i=>({id:i.id,title:ideaTitle(i),pitch:i.llm?i.llm.pitch:ideaText(i),founders:i.by.map(code),members:[...i.members].map(code),
       born:{day:i.born.day,clk:hhOf(i.born.clk),place:placeName(i.born.place)},versions:i.versions.length,lineage:i.lineage||null,

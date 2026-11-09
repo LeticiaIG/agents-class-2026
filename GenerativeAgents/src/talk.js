@@ -23,6 +23,13 @@ async function llmInit(){
   runNo=1+EPISODES.reduce((m,e)=>Math.max(m,e.run||0),0);
 }
 const EP_KEY="placelab-episodes",EP_MAX=400;
+/* memory condition (evaluation, eval/README.md): what each agent may bring from memory into a conversation
+   full    : retrieved memories (up to 3), history with this partner, ideas in play and from earlier runs
+   limited : one retrieved memory; no shared history; only this run's ideas in play
+   none    : nothing remembered: profile and topic only, no ideas to build on */
+const MEM_MODES=["full","limited","none"],MEM_KEY="placelab-memory-mode";
+let MEM_MODE=(()=>{try{const m=localStorage.getItem(MEM_KEY);return MEM_MODES.includes(m)?m:"full"}catch(e){return "full"}})();
+function setMemMode(m){if(!MEM_MODES.includes(m))return;MEM_MODE=m;try{localStorage.setItem(MEM_KEY,m)}catch(e){}}
 function saveEpisode(ep){
   if(LLM.server){postJSON("/api/episodes",{episodes:[ep]}).catch(()=>{});return}
   try{localStorage.setItem(EP_KEY,JSON.stringify(EPISODES.slice(-EP_MAX)))}catch(e){}
@@ -49,12 +56,14 @@ const placeEN=id=>SP_EN[id]||SP[id].n;
 
 /* ---------- a conversation: start (pending) → model answer → ideas, memory, episode ---------- */
 function startModelTalk(a,b,place){
-  const ta=pick(topicsOf(a.pf)),tb=pick(topicsOf(b.pf)),shared=pairEpisodes(a,b);
+  const ta=pick(topicsOf(a.pf)),tb=pick(topicsOf(b.pf)),shared=MEM_MODE==="full"?pairEpisodes(a,b):[];
   const inPlay=IDEAS.filter(i=>i.members.has(a)||i.members.has(b)).map(i=>({id:i.id,title:ideaTitle(i),pitch:(i.llm&&i.llm.pitch)||i.versions[i.versions.length-1].text}));
   const earlier=[];for(const e of [...shared,...EPISODES.filter(e=>e.idea&&(e.a===a.pf.code||e.b===a.pf.code||e.a===b.pf.code||e.b===b.pf.code)).slice(-4)])
     if(e.idea&&e.run<runNo&&!earlier.some(x=>x.id===e.idea.id))earlier.push({id:e.idea.id,title:e.idea.title,pitch:`from an earlier run (run ${e.run}): ${e.insight}`});
-  const side=(p,o,t)=>({project:p.pf.project,skills:p.pf.skills,interests:p.pf.interests,topic:{kind:t.kind,title:t.label,text:t.text},memories:episodeMemories(p,o,t)});
-  const ctx={lang,place:placeEN(place),time:clock(),A:side(a,b,ta),B:side(b,a,tb),shared_history:shared.map(epText),ideas:[...inPlay,...earlier.slice(0,4)]};
+  const nMem=MEM_MODE==="full"?3:MEM_MODE==="limited"?1:0;
+  const side=(p,o,t)=>({project:p.pf.project,skills:p.pf.skills,interests:p.pf.interests,topic:{kind:t.kind,title:t.label,text:t.text},memories:nMem?episodeMemories(p,o,t).slice(0,nMem):[]});
+  const ctx={lang,place:placeEN(place),time:clock(),A:side(a,b,ta),B:side(b,a,tb),shared_history:shared.map(epText),
+    ideas:MEM_MODE==="full"?[...inPlay,...earlier.slice(0,4)]:MEM_MODE==="limited"?inPlay:[]};
   const c={clk:clock(),day,place,a,b,lines:[],start:simT,shown:0,born:[],adopt:[],evo:[],agree:false,pending:true,topics:{a:ta.label,b:tb.label},followup:shared.length>0};  // the same two talked before, in this run or an earlier one
   convs.unshift(c);if(convs.length>80)convs.pop();dirtyConv=true;
   const offline=()=>{c.offline=true;return finishModelTalk(c,localConverse(ctx,shared[shared.length-1]),ctx)};   // offline.js
