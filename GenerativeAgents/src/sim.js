@@ -67,7 +67,8 @@ function makeAgent(i,pf,label,isUser){
   return a;
 }
 const profileFor=code=>{const p=PROFILES.find(p=>p.code===code);if(!p)return null;const u=CFG.user&&CFG.user.code===code?CFG.user.over||{}:{};return {...p,...u}};
-function init(){
+let RUN_MEM="full";   // the memory condition this run started with (talk.js MEM_MODE)
+function init(){RUN_MEM=MEM_MODE;
   agents.forEach(a=>{scene.remove(a.sp);scene.remove(a.sh);scene.remove(a.bub);a.sub.remove()});
   pulses.splice(0).forEach(p=>scene.remove(p.m));arcs.splice(0).forEach(p=>scene.remove(p.m));ghosts.splice(0).forEach(p=>scene.remove(p.m));
   stampN=0;stampGeo.setDrawRange(0,0);presenceHeat.clear();proposals.clear();
@@ -530,6 +531,8 @@ $("follow").addEventListener("click",()=>setFollow(!follow));
 const playIcon=$("playicon");
 $("play").addEventListener("click",()=>{if(finished)return;running=!running;playIcon.innerHTML=running?'<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>':'<path d="M7 4l13 8-13 8z"/>';$("play").setAttribute("aria-label",running?L("pause"):L("resume"));$("play").title=running?L("pause"):L("resume")});
 $("reset").addEventListener("click",()=>{running=true;init();renderAll();renderYouCard()});
+$("mem-mode").value=MEM_MODE;
+$("mem-mode").addEventListener("change",e=>{setMemMode(e.target.value);running=true;init();renderAll();renderYouCard()});
 $("days").addEventListener("change",()=>{CFG.days=+$("days").value;if(CFG.user)saveYou({...CFG.user,days:CFG.days});if(day>CFG.days&&!finished){finished=true;running=false;onFinish()}renderAll()});
 $("ff-day").addEventListener("click",()=>{if(!finished)fastForward(false)});
 $("ff-all").addEventListener("click",()=>{if(!finished)fastForward(true)});
@@ -573,4 +576,5 @@ llmInit().finally(()=>{
   if(userAgent&&location.hash.slice(1)==="sim")setFollow(true);
   requestAnimationFrame(loop);
 });
-function renderLLMMode(){const el=$("llm-mode");if(el)el.textContent=LLM.on?L2("llmOn")(LLM.model):L2("llmOff")}
+function renderLLMMode(){const el=$("llm-mode");if(el)el.textContent=(LLM.on?L2("llmOn")(LLM.model):L2("llmOff"))+" · "+L2("memNow")(L2("memModes")[MEM_MODE]);
+  const ml=$("t-mem");if(ml)ml.textContent=L2("mem");const ms=$("mem-mode");if(ms){[...ms.options].forEach(o=>o.textContent=L2("memModes")[o.value]);ms.title=L2("memT")[MEM_MODE]}}
